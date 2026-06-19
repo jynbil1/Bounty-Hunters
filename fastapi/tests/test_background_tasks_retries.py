@@ -177,3 +177,29 @@ def test_background_task_rejects_negative_retries() -> None:
 
     with pytest.raises(ValueError, match="max_retries"):
         tasks.add_task(task, max_retries=-1)
+
+
+@pytest.mark.anyio
+async def test_background_task_preserves_callable_on_error_keyword() -> None:
+    calls: list[str] = []
+    tasks = BackgroundTasks()
+
+    def task_with_on_error(on_error: Callable[[], str]) -> None:
+        calls.append(on_error())
+
+    def original_callback() -> str:
+        return "original keyword"
+
+    tasks.add_task(task_with_on_error, on_error=original_callback)
+
+    await tasks()
+
+    assert calls == ["original keyword"]
+    assert tasks.task_results == [
+        {
+            "task_name": "task_with_on_error",
+            "status": "success",
+            "exception": None,
+            "retry_count": 0,
+        }
+    ]
